@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument("--subsample", type=float, default=0.8)
     parser.add_argument("--verbosity", type=int, default=0)
     parser.add_argument("--objective", type=str, default="binary:logistic")
-    parser.add_argument("--num_round", type=int, default=50)
+    parser.add_argument("--num_round", type=int, default=500)
     parser.add_argument("--smdebug_path", type=str, default=None)
     parser.add_argument("--smdebug_frequency", type=int, default=1)
     parser.add_argument("--smdebug_collections", type=str, default='metrics')
@@ -64,12 +64,13 @@ def main():
 
     params = {
         "max_depth": args.max_depth,
-        "eta": args.eta,
-        "gamma": args.gamma,
-        "min_child_weight": args.min_child_weight,
         "subsample": args.subsample,
+        "eta": args.eta,
+        "gamma": args.gamma,        
+        "min_child_weight": args.min_child_weight,
+        "objective": args.objective,
         "verbosity": args.verbosity,
-        "objective": args.objective}
+        }
 
     # The output_uri is a the URI for the s3 bucket where the metrics will be
     # saved.
