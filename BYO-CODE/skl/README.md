@@ -37,7 +37,7 @@ Scikit-learn/
 │   ├── pipeline_graph.jpeg        # Pipeline workflow graph
 │   ├── lineage_graph.jpeg         # Lineage graph of artifacts
 │   └── model_version.jpeg         # Model version tracking image
-├── skl-sagemaker-pipeline-template-vxx.ipynb  # Jupyter notebook for building and running the pipeline
+├── scik-Learn-pipeline-template-v0x.ipyb  # Jupyter notebook for building and running the pipeline
 ```
 
 ## Getting Started
