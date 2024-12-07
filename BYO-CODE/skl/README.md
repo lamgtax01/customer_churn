@@ -23,21 +23,27 @@ This folder provides a comprehensive template for building, training, evaluating
 Scikit-learn/
 ├── Artifacts/           # Contains the trained model artifact
 │   └── model.tar.gz
+│
 ├── Code/                # Contains the scripts for various stages of the ML pipeline
 │   ├── preprocessing.py           # Data preprocessing script
 │   ├── preprocessing-pyspark.py   # Alternative preprocessing with PySpark
 │   ├── train.py                   # Training script
 │   ├── evaluation.py              # Model evaluation script
-│   ├── inference.py               # Inference script for predictions
+│   └── inference.py               # Inference script for predictions
+│
 ├── Evaluation/          # Stores the evaluation report
 │   └── evaluation.json
+│
 ├── Config/              # Contains configuration files for the pipeline
-│   └── config.json
+│   └── modelconfig.json
+│
 ├── images/              # Visual assets for the pipeline
-│   ├── pipeline_graph.jpeg        # Pipeline workflow graph
-│   ├── lineage_graph.jpeg         # Lineage graph of artifacts
-│   └── model_version.jpeg         # Model version tracking image
-├── scik-Learn-pipeline-template-v0x.ipyb  # Jupyter notebook for building and running the pipeline
+│   ├── model_lineage_graph.jpeg         # Lineage graph of artifacts
+│   ├── model_pending_approval.jpeg      # Model version tracking image    
+│   ├── pipeline_execution_graph.jpeg    # Pipeline workflow graph
+|   └── S3_bucket_structure.jpeg         # Structure of the S3 Bucket with input(code and dataset) and output (Artifacts and Metrics)  
+│
+└── scikit-Learn-pipeline-template-v0x.ipyb  # Jupyter notebook for building and running the pipeline
 ```
 
 ## Getting Started
