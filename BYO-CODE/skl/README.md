@@ -41,7 +41,7 @@ Scikit-learn/
 │   ├── model_lineage_graph.jpeg        # Lineage graph of artifacts
 │   ├── model_pending_approval.jpeg     # Model version tracking image    
 │   ├── pipeline_execution_graph.jpeg   # Pipeline workflow graph
-|   └── S3_bucket_structure.jpeg        # S3 Bucket Structure with input(code and dataset) and output (Artifacts and Metrics)  
+|   └── S3_bucket_structure.jpeg        # S3 Bucket with input(code & datasets) & output (Artifacts & Metrics)  
 │
 └── scikit-Learn-pipeline-template-v0x.ipyb  # Jupyter notebook for building and running the pipeline
 ```
