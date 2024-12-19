@@ -1,0 +1,101 @@
+import os
+import boto3
+from botocore.exceptions import ClientError
+
+sagemaker = boto3.client('sagemaker')
+s3_client = boto3.client('s3')
+MODEL_ARTIFACT_S3_URI = os.environ["MODEL_ARTIFACT_S3_URI"]
+SAGEMAKER_SKLEARN_IMAGE = os.environ["SAGEMAKER_SKLEARN_IMAGE"]
+INFERENCE_SCRIPT_NAME = os.environ["INFERENCE_SCRIPT_NAME"]
+INFERENCE_SCRIPT_S3_URI = os.environ["INFERENCE_SCRIPT_S3_URI"]
+BATCH_OUTPUT_S3_URI = os.environ["BATCH_OUTPUT_S3_URI"]
+INSTANCE_TYPE = os.environ["INSTANCE_TYPE"]
+INSTANCE_COUNT = os.environ["INSTANCE_COUNT"]
+MODEL_NAME = os.environ["MODEL_NAME"]
+BATCH_BASE_JOB_NAME = os.environ["BATCH_BASE_JOB_NAME"]
+DATA_CAPTURE_S3_URI = os.environ["DATA_CAPTURE_S3_URI"]
+
+def lambda_handler(event, context):
+    # Extract bucket and object key from the S3 event
+    bucket_name = event['Records'][0]['s3']['bucket']['name']
+    object_key = event['Records'][0]['s3']['object']['key']
+    print(f"Triggered file from s3: {object_key}.")
+    
+    # Define paths
+    input_file = f"s3://{bucket_name}/{object_key}"  
+    job_name = f"{os.environ["BATCH_BASE_JOB_NAME"]}-{context.aws_request_id}"  # Unique job name
+    
+    # Check if the SageMaker model already exists. If not create the model
+    try:
+        print(f"Check if the model {MODEL_NAME} exist.")
+        response = sagemaker.describe_model(ModelName=MODEL_NAME)
+        print(f"Model {MODEL_NAME} already exists. Using the existing model.")
+    except ClientError as e:
+        print(e)
+        if e.response['Error']['Code'] == 'ValidationException':
+            print(f"Model {MODEL_NAME} does not exist. Creating a new model...")
+    
+            try:
+                # Create the SageMaker Model
+                sagemaker.create_model(
+                    ModelName=MODEL_NAME,
+                    PrimaryContainer={
+                        'Image': SAGEMAKER_SKLEARN_IMAGE,
+                        'ModelDataUrl': MODEL_ARTIFACT_S3_URI,  # Path to the model artifact
+                        'Environment': {
+                            'SAGEMAKER_PROGRAM': INFERENCE_SCRIPT_NAME,  # Specify inference script name (e.g. inference.py)
+                            'SAGEMAKER_SUBMIT_DIRECTORY': INFERENCE_SCRIPT_S3_URI  # Specify inference script location in S3
+                        }
+                    },
+                    ExecutionRoleArn=os.environ['SAGEMAKER_ROLE'],  # IAM role for SageMaker
+                    Tags=[
+                        {
+                            'Key': 'CreatedFrom',
+                            'Value': 'Lambda Batch Transform Trigger'
+                        },
+                    ]
+                )
+                print(f"Model {MODEL_NAME} created successfully.")
+            except sagemaker.exceptions.ClientError as e:
+                print(f"Error creating model: {e}")
+                raise
+    
+    # Trigger the Batch Transform Job
+    try:        
+        print(f"Creating a Batch Transform job {job_name} for sagemaker model {MODEL_NAME}.")
+        sagemaker.create_transform_job(
+            TransformJobName=job_name,
+            ModelName=MODEL_NAME,
+            TransformInput={
+                'DataSource': {'S3DataSource': {'S3DataType': 'S3Prefix', 'S3Uri': input_file}},
+                'ContentType': 'text/csv',
+            },
+            TransformOutput={
+                'S3OutputPath': BATCH_OUTPUT_S3_URI,
+                'Accept': 'text/csv'
+            },
+            TransformResources={
+                'InstanceType': INSTANCE_TYPE,
+                'InstanceCount': int(INSTANCE_COUNT)
+            },
+            DataCaptureConfig={
+                'DestinationS3Uri': DATA_CAPTURE_S3_URI,
+                # 'KmsKeyId': 'string',
+                'GenerateInferenceId': True
+            },
+            Tags=[
+                {
+                    'Key': 'CreatedFrom',
+                    'Value': 'Lambda Batch Transform Trigger'
+                },
+            ]
+        )        
+        print(f"Batch Transform Job {job_name} started successfully.")
+    except sagemaker.exceptions.ClientError as e:
+        print(f"Error starting transform job: {e}")
+        raise
+    
+    return {
+        'statusCode': 200,
+        'body': f"Batch transform job {job_name} successfully initiated."
+    }
