@@ -1,0 +1,8 @@
+Option	Use Case	Output Storage
+Real-time inference	Low-latency predictions for apps needing immediate responses (e.g., fraud detection, chatbots).	Direct response to the client (no persistent output storage).
+Serverless inference	Cost-effective, scalable real-time predictions for intermittent, lightweight workloads.	Direct response to the client (no persistent output storage).
+Batch transform	Offline bulk processing of large datasets (e.g., daily analytics, large-scale data transformations).	Amazon S3 (specified during job configuration).
+Asynchronous inference	Large payloads, long-running tasks, near real-time predictions (e.g., video processing, large ML models).	Amazon S3 (specified in OutputConfig).
+
+
+
