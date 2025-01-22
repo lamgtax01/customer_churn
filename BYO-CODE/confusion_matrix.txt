@@ -1,0 +1,33 @@
+import numpy as np
+
+def estimate_confusion_matrix(precision, recall, f1, accuracy, total_samples):
+    """
+    Estimate confusion matrix from precision, recall, F1-score, and accuracy.
+    
+    Args:
+        precision (float): Precision value.
+        recall (float): Recall value.
+        f1 (float): F1-score.
+        accuracy (float): Accuracy.
+        total_samples (int): Total number of samples in the dataset.
+        
+    Returns:
+        tuple: Confusion matrix (TP, FP, FN, TN).
+    """
+    # Derive TP, FP, FN from precision, recall, and F1
+    tp = (2 * precision * recall * total_samples) / ((precision + recall) * (1 - accuracy + recall))
+    fn = (1 - recall) * tp / recall
+    fp = tp / precision - tp
+    tn = total_samples - tp - fp - fn
+    
+    return int(round(tp)), int(round(fp)), int(round(fn)), int(round(tn))
+
+# Example usage:
+precision = 0.8
+recall = 0.75
+f1 = 0.775
+accuracy = 0.85
+total_samples = 1000
+
+tp, fp, fn, tn = estimate_confusion_matrix(precision, recall, f1, accuracy, total_samples)
+print(f"Confusion Matrix: TP={tp}, FP={fp}, FN={fn}, TN={tn}")
