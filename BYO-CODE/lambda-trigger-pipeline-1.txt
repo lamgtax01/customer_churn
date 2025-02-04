@@ -1,0 +1,37 @@
+import json
+import boto3
+import os
+# import urllib.parse
+
+# Initialize AWS clients
+s3_client = boto3.client("s3")
+sagemaker_client = boto3.client("sagemaker")
+
+# Environment variables
+PIPELINE_NAME = os.environ["PIPELINE_NAME"]
+
+def lambda_handler(event, context):
+    print("Event:", json.dumps(event, indent=2))
+    
+    for record in event["Records"]:
+        source_bucket = record["s3"]["bucket"]["name"]
+        object_key = record["s3"]["object"]["key"]
+        # decoded_key = urllib.parse.unquote(object_key)  # Decode URL-encoded filenames
+
+        print(f"Source Bucket: {source_bucket}")
+        print(f"New file uploaded: {object_key}")
+
+        try:
+            # Trigger SageMaker pipeline execution
+            response = sagemaker_client.start_pipeline_execution(
+                PipelineName=PIPELINE_NAME,
+                PipelineExecutionDisplayName=f"Triggered-by-lambda",
+            )
+            
+            print(f"SageMaker pipeline execution started: {response['PipelineExecutionArn']}")
+
+        except Exception as e:
+            print(f"Error starting SageMaker pipeline: {str(e)}")
+            return {"statusCode": 500, "body": str(e)}
+
+    return {"statusCode": 200, "body": "Sagemaker pipeline triggered successfully"}
