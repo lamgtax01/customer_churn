@@ -1,0 +1,38 @@
+import json
+import boto3
+import os
+
+sns_client = boto3.client("sns")
+
+SNS_TOPIC_ARN = os.environ["SNS_TOPIC_ARN"]
+
+def lambda_handler(event, context):
+    print("Event received:", json.dumps(event, indent=2))
+
+    # Extract event details
+    detail = event["detail"]
+    pipeline_name = detail.get("PipelineName", "Unknown Pipeline")
+    execution_arn = detail.get("PipelineExecutionArn", "N/A")
+    status = detail.get("PipelineExecutionStatus", "UNKNOWN")
+
+    # Set message based on status
+    if status == "Succeeded":
+        subject = f"✅ SageMaker Pipeline {pipeline_name} Succeeded!"
+        message = f"The SageMaker pipeline **{pipeline_name}** has successfully completed.\n\nExecution ARN: {execution_arn}"
+    elif status == "Failed":
+        subject = f"❌ SageMaker Pipeline {pipeline_name} Failed!"
+        message = f"The SageMaker pipeline **{pipeline_name}** has failed.\n\nExecution ARN: {execution_arn}"
+    else:
+        subject = f"⚠️ SageMaker Pipeline {pipeline_name} Status: {status}"
+        message = f"The SageMaker pipeline **{pipeline_name}** changed state to **{status}**.\n\nExecution ARN: {execution_arn}"
+
+    # Send SNS notification
+    response = sns_client.publish(
+        TopicArn=SNS_TOPIC_ARN,
+        Subject=subject,
+        Message=message
+    )
+
+    print("SNS Notification Sent:", response)
+
+    return {"statusCode": 200, "body": "Notification sent successfully"}
