@@ -1,0 +1,65 @@
+{
+  "Comment": "Step Function to Start and Monitor SageMaker Pipeline",
+  "StartAt": "StartPipeline",
+  "States": {
+    "StartPipeline": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:startPipelineExecution",
+      "Parameters": {
+        "PipelineName": "pipeline1"
+      },
+      "ResultPath": "$.PipelineExecution",
+      "Next": "WaitForPipeline"
+    },
+    "WaitForPipeline": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "CheckPipelineStatus"
+    },
+    "CheckPipelineStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:sagemaker:describePipelineExecution",
+      "Parameters": {
+        "PipelineExecutionArn.$": "$.PipelineExecution.PipelineExecutionArn"
+      },
+      "ResultPath": "$.PipelineStatus",
+      "Next": "IsPipelineFinished"
+    },
+    "IsPipelineFinished": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.PipelineStatus.PipelineExecutionStatus",
+          "StringEquals": "Succeeded",
+          "Next": "SendSuccessNotification"
+        },
+        {
+          "Variable": "$.PipelineStatus.PipelineExecutionStatus",
+          "StringEquals": "Failed",
+          "Next": "SendFailureNotification"
+        }
+      ],
+      "Default": "WaitForPipeline"
+    },
+    "SendSuccessNotification": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:123456789012:YourSNSTopic",
+        "Message": "SageMaker pipeline execution succeeded!",
+        "Subject": "Pipeline Success"
+      },
+      "End": true
+    },
+    "SendFailureNotification": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:123456789012:YourSNSTopic",
+        "Message": "SageMaker pipeline execution failed!",
+        "Subject": "Pipeline Failure"
+      },
+      "End": true
+    }
+  }
+}
