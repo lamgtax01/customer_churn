@@ -1,0 +1,11 @@
+/terraform/
+│── main.tf              # Defines AWS resources
+│── variables.tf         # Stores all Terraform variables
+│── outputs.tf           # Outputs for Terraform
+│── providers.tf         # AWS provider setup
+│── backend.tf           # S3 + DynamoDB for Terraform state
+│── lambda/
+│   ├── lambda_datadrift.py   # Python code for Data Drift Lambda
+│   ├── lambda_modeldrift.py  # Python code for Model Drift Lambda
+│── jenkins/
+│   ├── Jenkinsfile       # Jenkins Pipeline script

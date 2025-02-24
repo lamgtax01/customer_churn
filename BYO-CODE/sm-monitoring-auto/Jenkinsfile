@@ -1,0 +1,28 @@
+pipeline {
+    agent any
+    environment {
+        ENV = "dev" // Change as needed
+    }
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git 'https://bitbucket.org/myrepo.git'
+            }
+        }
+        stage('Terraform Init') {
+            steps {
+                sh 'terraform init'
+            }
+        }
+        stage('Terraform Plan') {
+            steps {
+                sh 'terraform plan -var="env=$ENV"'
+            }
+        }
+        stage('Terraform Apply') {
+            steps {
+                sh 'terraform apply -auto-approve -var="env=$ENV"'
+            }
+        }
+    }
+}

@@ -1,0 +1,51 @@
+I need a terraform code to deploy resources on AWS Cloud:
+
+  0. S3 bucket and dynamodb table creation
+	0.1 create a s3 bucket s3-<env>-use1-mrm240002-lambda-code where lambda code will be store
+        0.2 create a s3 bucket s3-<env>-use1-mrm240002-remote-state where the remote state will be store
+        0.3 create a dynamo table dynamo-<env>-use1-mrm240002-remote-state that will be use for concurrent access
+
+  1. Create a lambda function called: lam-<env>-use1-mrm240002-datadrift
+      1.a Lambda must have environment variable called: DATA_DRIFT_PIPELINE
+      1.b Lambda code is on local folder: ./code/lambda_mrm240002_datadrift/lambda_datadrift.py (write the lambda code as well)
+  2. Create a S3 Event Notification (called: s3eventNotfn_mrm240002_inf) on s3 bucket s3-<env>-use1-ail1-x (Bucket already exist and must be define as variable) that:
+      2.a trigger lambda lam-<env>-use1-mrm240002-datadrift created in point 1.
+      2.b it trigger for events PUT and POST when the files with extension .csv is PUT/POST on folder bdp_extract/aczhd01<env_letter>_extract_bronze_ad/mrm2400002_INF/ (define this folder as variable folder_mrm2400002_INF)
+
+  3. Create a lambda function called: lam-<env>-use1-mrm240002-modeldrift
+      3.a Lambda must have environment variable called: MODEL_DRIFT_PIPELINE
+      3.b Lambda code is on local folder: ./code/lambda_mrm240002_modeldrift/lambda_modeldrift.py (write the lambda code as well)
+  4. Create a S3 Event Notification (called: s3eventNotfn_mrm240002_grt) on s3 bucket s3-<env>-use1-ail1-x (Bucket already exist and must be define as variable) that:
+      4.a trigger lambda lam-<env>-use1-mrm240002-modeldrift created in point 1.
+      4.b it trigger for events PUT and POST when the files with extension .csv is PUT/POST on folder bdp_extract/aczhd01<env_letter>_extract_silver_ad/mrm2400002_GT/ (define this folder as variable folder_mrm2400002_GT)
+
+  5. Create 1 iam role (lam-<dev>-use1-sagemaker-monitoring) that will be use by both Lambda function and must have permissions:
+        - to create and access CloudWatch logs
+        - to Start existing SageMaker Pipeline (DATA_DRIFT_PIPELINE and MODEL_DRIFT_PIPELINE)
+
+  6. Configure tf env variable corresponding to the environment (dev, qa, test, prod) where we are executing terraform code 
+  7. each time we execute terraform plan or terraform apply, we must specify the value of the env variable where we are (dev, qa, test, prod).
+  8. the code will be push to Bitbucket and Jenkins server will pull the code and deploy on AWS: Provide me the JenkinsFile code 
+
+Note:
+  <env> must be replace env variable value (dev, qa, test, prod) that we enter when executing terraform plan or terraform apply.
+
+  <env_letter> must be replace by:
+    d if env=dev
+    q if env=qa
+    t if env=test
+    p if env=prod
+
+
+./init.sh dev
+./init.sh qa
+
+terraform plan -var="env=dev"
+terraform apply -var="env=dev"
+
+dynamodb_table_name = "dynamo-dev-use1-mrm240002-remote-state"
+s3_backend_bucket = "s3-dev-use1-mrm240002-remote-state"
+
+terraform init -backend-config="backend_dev.tf"
+terraform plan -var="env=dev"
+terraform apply -var="env=dev" -auto-approve
