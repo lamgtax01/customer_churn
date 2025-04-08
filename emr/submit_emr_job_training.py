@@ -16,8 +16,9 @@ job_type = os.environ["JOB_TYPE"]
 app_info_key = os.environ["APP_INFO_KEY"]
 entry_point = os.environ["ENTRY_POINT"]
 emr_role = os.environ["EMR_ROLE"]
-input_path = os.environ["IMPUT"]
 output_path = os.environ["OUTPUT"]
+train = os.environ["TRAIN"]
+validation = os.environ["VALIDATION"]
 
 # Load app_id
 obj = s3.get_object(Bucket=bucket, Key=app_info_key)
@@ -31,8 +32,9 @@ response = emr.start_job_run(
         "sparkSubmit": {
             "entryPoint": entry_point,
             "entryPointArguments": [
-                "--input", input_path,
-                "--output", output_path,
+                "--train", train,
+                "--validation", validation,
+                "--model_output", output_path
             ]
         }
     },
