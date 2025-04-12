@@ -4,42 +4,59 @@ from pyspark.ml.evaluation import BinaryClassificationEvaluator, MulticlassClass
 import argparse
 import json
 import os
+import tarfile
+import boto3
 
-# 🎯 CLI args
+# 🎯 Parse CLI
 parser = argparse.ArgumentParser()
 parser.add_argument("--test", type=str, required=True)
-parser.add_argument("--model_path", type=str, required=True)
+parser.add_argument("--model_path", type=str, required=True)  # s3://.../model.tar.gz
 parser.add_argument("--eval_output", type=str, required=True)
 parser.add_argument("--label_column", type=str, required=True)
 args = parser.parse_args()
 
-# 🧠 Column config
 label_col = args.label_column
 indexed_label_col = "indexedLabel"
 
 # 🚀 Spark session
 spark = SparkSession.builder.appName("SparkEvaluation").getOrCreate()
 
-# 📂 Load model & test set
-model = PipelineModel.load(args.model_path)
+# 📁 Download model.tar.gz to /tmp
+local_tar_path = "/tmp/model.tar.gz"
+s3 = boto3.client("s3")
+
+bucket = args.model_path.replace("s3://", "").split("/")[0]
+key = "/".join(args.model_path.replace("s3://", "").split("/")[1:])
+
+s3.download_file(bucket, key, local_tar_path)
+print(f"✅ Downloaded model.tar.gz from s3://{bucket}/{key}")
+
+# 📦 Extract model.tar.gz to /tmp/model
+extract_path = "/tmp/model"
+os.makedirs(extract_path, exist_ok=True)
+
+with tarfile.open(local_tar_path, "r:gz") as tar:
+    tar.extractall(path=extract_path)
+print("📦 Extracted model.tar.gz to /tmp/model")
+
+# 🔄 Load Spark MLlib model from extracted path
+model = PipelineModel.load(os.path.join(extract_path, "model"))
+
+# 🧾 Load test data
 test_df = spark.read.parquet(args.test)
 
-# 🔮 Predictions
+# 🔮 Predict
 predictions = model.transform(test_df)
 
 # 📊 Evaluators
 binary_eval = BinaryClassificationEvaluator(
-    labelCol=indexed_label_col,
-    rawPredictionCol="rawPrediction",
-    metricName="areaUnderROC"
+    labelCol=indexed_label_col, rawPredictionCol="rawPrediction", metricName="areaUnderROC"
 )
-
 multi_eval = MulticlassClassificationEvaluator(
-    labelCol=indexed_label_col,
-    predictionCol="prediction"
+    labelCol=indexed_label_col, predictionCol="prediction"
 )
 
-# ✅ Calculate metrics
+# ✅ Compute metrics
 metrics = {
     "accuracy": round(multi_eval.evaluate(predictions, {multi_eval.metricName: "accuracy"}), 4),
     "precision": round(multi_eval.evaluate(predictions, {multi_eval.metricName: "weightedPrecision"}), 4),
@@ -48,33 +65,25 @@ metrics = {
     "auc": round(binary_eval.evaluate(predictions), 4)
 }
 
-# 🧪 Build AWS-compatible JSON
-aws_format_metrics = {
+# 🧪 AWS SageMaker JSON format
+evaluation_json = {
     "binary_classification_metrics": {
-        metric_name: {
-            "value": metric_value,
-            "standard_deviation": "NaN"
-        }
-        for metric_name, metric_value in metrics.items()
+        k: {"value": v, "standard_deviation": "NaN"} for k, v in metrics.items()
     }
 }
 
-# 💾 Write evaluation.json locally
+# 💾 Save locally
 output_dir = "/tmp/evaluation"
 os.makedirs(output_dir, exist_ok=True)
 output_path = os.path.join(output_dir, "evaluation.json")
-
 with open(output_path, "w") as f:
-    json.dump(aws_format_metrics, f, indent=4)
+    json.dump(evaluation_json, f, indent=4)
 
-# ☁️ Upload to S3 using Hadoop FS
-hadoop_conf = spark._jsc.hadoopConfiguration()
-fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(hadoop_conf)
+# ☁️ Upload evaluation.json using boto3
+bucket = args.eval_output.replace("s3://", "").split("/")[0]
+prefix = "/".join(args.eval_output.replace("s3://", "").split("/")[1:])
+key = f"{prefix}/evaluation.json" if prefix else "evaluation.json"
 
-src_path = spark._jvm.org.apache.hadoop.fs.Path("file://" + output_path)
-dst_path = spark._jvm.org.apache.hadoop.fs.Path(args.eval_output + "/evaluation.json")
+s3.upload_file(output_path, bucket, key)
+print(f"✅ evaluation.json uploaded to s3://{bucket}/{key}")
 
-fs.copyFromLocalFile(False, True, src_path, dst_path)
-
-print(f"✅ evaluation.json uploaded to {args.eval_output}/evaluation.json (AWS-compatible format)")
-n.json")
