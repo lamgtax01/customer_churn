@@ -5,12 +5,12 @@ import csv
 from datetime import datetime
 
 # --- 0. ENVIRONMENT VARIABLES ---
-S3_BUCKET_OUTPUT = os.environ["S3_BUCKET_OUTPUT"]   # e.g. s3://mybucket01
-S3_PSI_KEY = os.environ["S3_PSI_KEY"]               # e.g. data/psi.csv
-S3_PSI_FOLDER = os.environ["S3_PSI_FOLDER"]               # e.g. data
-SART_DATE = os.environ["SART_DATE"]                 # e.g. 20250310
-SNS_TOPIC = os.environ["SNS_TOPIC"]                 # e.g. ModelDriftMonitoringCheckAlert
-PSI_THRESHOLD = float(os.environ["PSI_THRESHOLD"])  # e.g. 0.02
+S3_BUCKET_OUTPUT = os.environ["S3_BUCKET_OUTPUT"]   
+S3_PSI_KEY = os.environ["S3_PSI_KEY"]               
+S3_PSI_FOLDER = os.environ["S3_PSI_FOLDER"]              
+SART_DATE = os.environ["SART_DATE"]                 
+SNS_TOPIC = os.environ["SNS_TOPIC"]                 
+PSI_THRESHOLD = float(os.environ["PSI_THRESHOLD"])  
 
 print("S3_BUCKET_OUTPUT:", S3_BUCKET_OUTPUT)
 print("S3_PSI_KEY:", S3_PSI_KEY)
@@ -35,14 +35,14 @@ def lambda_handler(event, context):
     for row in csv_reader:
         print(row)
         try:
-            name = row[1]  # Name
-            psi = float(row[2])     # PSI
-            date = str(row[3])     # date            
+            name = row[1]  
+            psi = float(row[2])     
+            date = str(row[3])               
             if date > SART_DATE and psi > PSI_THRESHOLD:
                 print("name:",name, "psi:", psi , "date:", date)
                 violations.append({"name": name, "psi": psi, "date": date})
         except (KeyError, ValueError) as e:
-            continue  # skip malformed rows
+            continue  
 
     # --- 3. FORMAT SNS MESSAGE ---
     if not violations:
@@ -60,7 +60,7 @@ def lambda_handler(event, context):
             writer.writerow([v["name"], v["psi"], v["date"]])
 
         # Prepare S3 path
-        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")  # e.g. 20250417_143025
+        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")  
         drift_key = f"{S3_PSI_FOLDER}/drifts-detected/{date_str}/drifts_detected_psi.csv"
 
         # Upload to S3
