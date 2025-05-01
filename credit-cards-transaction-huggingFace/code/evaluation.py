@@ -1,87 +1,110 @@
-# evaluate.py
-
-import pandas as pd
 import os
 import json
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from sklearn.metrics import classification_report, roc_auc_score, roc_curve, precision_recall_curve
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
 from datasets import Dataset
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    roc_curve,
+    precision_recall_curve,
+)
 from sklearn.preprocessing import LabelEncoder
+import matplotlib.pyplot as plt
 
-# Load test data
+# 🔧 Paths
+model_dir = "/opt/ml/processing/model"
 test_path = "/opt/ml/processing/test/test.parquet"
+output_dir = "/opt/ml/processing/evaluation"
+os.makedirs(output_dir, exist_ok=True)
+
+# 🧪 Load test data
 df = pd.read_parquet(test_path)
+df = df.dropna(subset=["description", "label"])
 
 # Encode labels
 label_encoder = LabelEncoder()
 df["label"] = label_encoder.fit_transform(df["label"])
 
-# Load model
-model_dir = "/opt/ml/processing/model"
-model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+# Load model & tokenizer
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(device)
 tokenizer = AutoTokenizer.from_pretrained(model_dir)
+model.eval()
 
 # Tokenize
 dataset = Dataset.from_pandas(df)
-def preprocess(example):
-    return tokenizer(example["description"], padding="max_length", truncation=True)
-dataset = dataset.map(preprocess, batched=True)
+dataset = dataset.map(lambda x: tokenizer(x["description"], padding="max_length", truncation=True), batched=True)
+labels = df["label"].values
+dataset.set_format(type="torch", columns=["input_ids", "attention_mask"])
 
 # Predict
-model.eval()
-inputs = dataset.remove_columns(["description", "label"]).with_format("torch")
-labels = dataset["label"]
-preds = []
-
+pred_logits = []
 with torch.no_grad():
-    for batch in torch.utils.data.DataLoader(inputs, batch_size=32):
+    for batch in torch.utils.data.DataLoader(dataset, batch_size=32):
+        batch = {k: v.to(device) for k, v in batch.items()}
         outputs = model(**batch)
-        logits = outputs.logits
-        batch_preds = torch.argmax(logits, dim=1).cpu().numpy()
-        preds.extend(batch_preds)
+        pred_logits.append(outputs.logits.cpu().numpy())
 
-# Classification Report
-report = classification_report(labels, preds, output_dict=True)
-accuracy = report["accuracy"]
-precision = report["weighted avg"]["precision"]
-recall = report["weighted avg"]["recall"]
-f1 = report["weighted avg"]["f1-score"]
+pred_logits = np.concatenate(pred_logits, axis=0)
+preds = np.argmax(pred_logits, axis=1)
 
-metrics = {
-    "metrics": {
-        "accuracy": accuracy,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1
+# 🧮 Metrics
+accuracy = accuracy_score(labels, preds)
+precision = precision_score(labels, preds, average="weighted", zero_division=0)
+recall = recall_score(labels, preds, average="weighted", zero_division=0)
+f1 = f1_score(labels, preds, average="weighted", zero_division=0)
+
+# AUC only if binary
+try:
+    auc = roc_auc_score(labels, pred_logits[:, 1]) if pred_logits.shape[1] == 2 else float("nan")
+except Exception:
+    auc = float("nan")
+
+# ✅ AWS-formatted metrics
+report_dict = {
+    "binary_classification_metrics": {
+        "accuracy": {"value": accuracy, "standard_deviation": "NaN"},
+        "precision": {"value": precision, "standard_deviation": "NaN"},
+        "recall": {"value": recall, "standard_deviation": "NaN"},
+        "f1": {"value": f1, "standard_deviation": "NaN"},
+        "auc": {"value": auc, "standard_deviation": "NaN"},
     }
 }
 
-os.makedirs("/opt/ml/processing/evaluation", exist_ok=True)
-with open("/opt/ml/processing/evaluation/metrics.json", "w") as f:
-    json.dump(metrics, f)
+# Save AWS-style metrics
+with open(os.path.join(output_dir, "evaluation.json"), "w") as f:
+    json.dump(report_dict, f)
 
-# Curves
-def save_plot(y_true, y_pred, title, filename):
+print("✅ Evaluation metrics saved:", report_dict)
+
+# 📊 Save ROC & PR curves
+def save_plot(y_true, y_score, title, filename):
     plt.figure()
     if title == "ROC":
-        fpr, tpr, _ = roc_curve(y_true, y_pred, pos_label=1)
+        fpr, tpr, _ = roc_curve(y_true, y_score)
         plt.plot(fpr, tpr, label="ROC Curve")
-        plt.xlabel("FPR")
-        plt.ylabel("TPR")
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
     elif title == "Precision-Recall":
-        precision, recall, _ = precision_recall_curve(y_true, y_pred, pos_label=1)
+        precision, recall, _ = precision_recall_curve(y_true, y_score)
         plt.plot(recall, precision, label="PR Curve")
         plt.xlabel("Recall")
         plt.ylabel("Precision")
     plt.title(title)
     plt.legend()
-    plt.savefig(f"/opt/ml/processing/evaluation/{filename}.jpg")
+    plt.savefig(os.path.join(output_dir, f"{filename}.jpg"))
+    plt.close()
 
-# For multiclass AUC, this is simplified; in real cases use OneVsRest
-save_plot(labels, preds, "ROC", "roc")
-save_plot(labels, preds, "Precision-Recall", "pr")
-
-
+# Only for binary classification
+if pred_logits.shape[1] == 2:
+    scores = pred_logits[:, 1]
+    save_plot(labels, scores, "ROC", "roc")
+    save_plot(labels, scores, "Precision-Recall", "pr")
+else:
+    print("⚠️ ROC/PR curves skipped — not binary classification.")
