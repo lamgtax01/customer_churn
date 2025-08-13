@@ -1,0 +1,5 @@
+Inference Mode	Description	Typical Use Case
+Real-time inference	Low-latency, HTTPS API endpoint backed by a deployed model container.	Chatbots, fraud detection APIs, recommendation engines.
+Asynchronous inference	Request/response pattern with S3 input/output. Good for long-running jobs.	Document processing, video analysis.
+Batch transform	Runs predictions on a large dataset without a live endpoint.	Offline scoring of millions of rows/images.
+Serverless inference	Pay-per-request; no persistent endpoint; scales to zero.	Low-volume or sporadic inference traffic.
