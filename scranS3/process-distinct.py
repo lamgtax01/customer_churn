@@ -31,3 +31,12 @@ def extract_matching_duplicated_values(df, bucket, key, obj_metadata):
                     ])
         except Exception:
             continue
+
+import pyarrow.parquet as pq
+import io
+
+def read_parquet_from_s3(bucket, key):
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    data = obj['Body'].read()
+    table = pq.read_table(io.BytesIO(data))
+    return table.to_pandas()
